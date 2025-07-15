@@ -6,12 +6,15 @@ import 'package:customer/controller/dash_board_controller.dart';
 import 'package:customer/model/airport_model.dart';
 import 'package:customer/model/banner_model.dart';
 import 'package:customer/model/credit_card_model.dart';
+import 'package:customer/model/driver_user_model.dart';
 import 'package:customer/model/order/location_lat_lng.dart';
 import 'package:customer/model/order/positions.dart';
 import 'package:customer/model/order_model.dart';
 import 'package:customer/model/service_model.dart';
 import 'package:customer/model/user_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
 import 'package:customer/model/zone_model.dart';
+import 'package:customer/services/pagarme_service.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/utils/custom_snack_bar.dart';
 import 'package:customer/utils/fire_store_utils.dart';
@@ -24,6 +27,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:osm_nominatim/osm_nominatim.dart';
+import 'package:http/http.dart' as http;
 
 class HomeController extends GetxController {
   DashBoardController dashboardController = Get.put(DashBoardController());
@@ -48,6 +52,10 @@ class HomeController extends GetxController {
   Rx<OrderModel> orderModel = OrderModel().obs;
 
   RxBool isSelected = true.obs;
+
+  RxBool isProcessingPayment = false.obs;
+
+  Rx<DriverUserModel> acceptedDriverModel = DriverUserModel().obs;
 
   final PageController pageController = PageController(viewportFraction: 0.96, keepPage: true);
 
@@ -287,6 +295,10 @@ class HomeController extends GetxController {
   Future<void> cancelTrip(BuildContext context) async {
     List<dynamic> acceptDriverId = [];
 
+    // Reset das variáveis do pagamento automático
+    isProcessingPayment.value = false;
+    acceptedDriverModel.value = DriverUserModel();
+
     orderModel.value.status = Constant.rideCanceled;
     orderModel.value.acceptedDriverId = acceptDriverId;
     await FireStoreUtils.setOrder(orderModel.value).then((value) {
@@ -294,16 +306,147 @@ class HomeController extends GetxController {
     });
   }
 
-// Future<void> searchNewDriver() async {
-//     OrderModel modelStatus = await FireStoreUtils.getOrderById(orderModel.value.id!);
-//
-//     if(modelStatus.status == Constant.ridePlaced) {
-//       Get.to(
-//           const OrderDetailsScreen(),
-//           arguments: {
-//             "orderModel": orderModel,
-//           });
-//     }
-//   }
+  void resetForNewRide() {
+    isProcessingPayment.value = false;
+    acceptedDriverModel.value = DriverUserModel();
+    orderModel.value = OrderModel();
+  }
+
+
+  Future<double> calculateAutomaticRideAmount() async {
+    try {
+      var finalRate = orderModel.value.offerRate ?? "0";
+      return double.parse(finalRate.toString());
+    } catch (e) {
+      throw Exception('Erro ao calcular valor da corrida');
+    }
+  }
+
+  // NOVA FUNÇÃO: Processar pagamento automático quando motorista aceita
+  Future<void> processAutomaticPayment() async {
+    try {
+      if (isProcessingPayment.value) return; // Evitar processamento duplo
+
+      isProcessingPayment.value = true;
+
+      // Buscar motorista que aceitou
+      if (orderModel.value.acceptedDriverId != null &&
+          orderModel.value.acceptedDriverId!.isNotEmpty) {
+
+        String driverId = orderModel.value.acceptedDriverId!.first;
+
+        // Buscar dados do motorista
+        DriverUserModel? driver = await FireStoreUtils.getDriver(driverId);
+        if (driver != null) {
+          acceptedDriverModel.value = driver;
+        }
+
+        // Calcular valor
+        double amount = await calculateAutomaticRideAmount();
+
+        // Processar pagamento
+        await _executePayment(amount);
+
+        // Ativar corrida
+        await _activateRideAutomatically(driverId, amount);
+
+        // Enviar notificação
+        if (driver?.fcmToken != null) {
+          await _sendAcceptanceNotification(driver!);
+        }
+      }
+
+    } catch (e) {
+      print("Erro no processamento automático: $e");
+      throw e;
+    } finally {
+      isProcessingPayment.value = false;
+    }
+  }
+
+  // NOVA FUNÇÃO: Executar pagamento
+  Future<void> _executePayment(double amount) async {
+    PagarMeService pagarmeService = PagarMeService();
+
+    if (orderModel.value.creditCard != null) {
+      var creditCard = orderModel.value.creditCard!;
+
+      if (creditCard.transationalType != 'PIX') {
+        // Pagamento com cartão
+        http.Response response = await pagarmeService.createOrder(
+          amount: int.parse(amount.toString().replaceAll('.', '')),
+          creditCard: creditCard,
+          orderId: orderModel.value.id!,
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Falha no pagamento com cartão');
+        }
+      } else {
+        // Pagamento PIX
+        http.Response response = await pagarmeService.createPixTransaction(
+          amount: int.parse(amount.toString().replaceAll('.', '')),
+          orderId: orderModel.value.id!,
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Falha no pagamento PIX');
+        }
+      }
+
+      // Registrar transação
+      await _createWalletTransaction(amount);
+    }
+  }
+
+  // NOVA FUNÇÃO: Criar transação na carteira
+  Future<void> _createWalletTransaction(double amount) async {
+    WalletTransactionModel transactionModel = WalletTransactionModel(
+      id: Constant.getUuid(),
+      amount: "-$amount",
+      createdDate: Timestamp.now(),
+      paymentType: orderModel.value.creditCard!.transationalType == 'credit' ? 'Cartão' : 'PIX',
+      transactionId: orderModel.value.id,
+      note: "Valor da viagem débitada".tr,
+      orderType: "city",
+      userType: "customer",
+      userId: FireStoreUtils.getCurrentUid(),
+    );
+
+    await FireStoreUtils.setWalletTransaction(transactionModel);
+    await FireStoreUtils.updateUserWallet(amount: amount.toString());
+  }
+
+  // NOVA FUNÇÃO: Ativar corrida automaticamente
+  Future<void> _activateRideAutomatically(String driverId, double amount) async {
+    orderModel.value.acceptedDriverId = [];
+    orderModel.value.driverId = driverId;
+    orderModel.value.status = Constant.rideActive;
+    orderModel.value.finalRate = amount.toString();
+
+    await FireStoreUtils.setOrder(orderModel.value);
+  }
+
+  // NOVA FUNÇÃO: Enviar notificação de aceitação
+  Future<void> _sendAcceptanceNotification(DriverUserModel driver) async {
+    await SendNotification.sendOneNotification(
+      token: driver.fcmToken.toString(),
+      title: 'Corrida Confirmada'.tr,
+      body: 'Sua solicitação de viagem foi aceita pelo passageiro. Por favor, prossiga para o local de retirada.'.tr,
+      payload: {},
+    );
+  }
+
+  // NOVA FUNÇÃO: Verificar se há motorista aceito (para usar na UI)
+  bool hasAcceptedDriver() {
+    return orderModel.value.acceptedDriverId != null &&
+        orderModel.value.acceptedDriverId!.isNotEmpty;
+  }
+
+  // NOVA FUNÇÃO: Verificar se corrida está sendo processada
+  bool isRideBeingProcessed() {
+    return hasAcceptedDriver() &&
+        orderModel.value.status == Constant.ridePlaced;
+  }
 
 }

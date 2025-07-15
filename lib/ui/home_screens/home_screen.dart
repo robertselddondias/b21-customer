@@ -2,13 +2,22 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/constant/collection_name.dart';
 import 'package:customer/constant/constant.dart';
+import 'package:customer/constant/send_notification.dart';
+import 'package:customer/constant/show_toast_dialog.dart';
+import 'package:customer/controller/driver_info_controller.dart';
 import 'package:customer/controller/home_controller.dart';
 import 'package:customer/model/credit_card_model.dart';
+import 'package:customer/model/driver_user_model.dart';
 import 'package:customer/model/order/location_lat_lng.dart';
 import 'package:customer/model/order_model.dart';
+import 'package:customer/model/user_model.dart';
+import 'package:customer/model/wallet_transaction_model.dart';
+import 'package:customer/services/pagarme_service.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:customer/themes/responsive.dart';
+import 'package:customer/ui/orders/driver_info_screen.dart';
 import 'package:customer/ui/orders/order_details_screen.dart';
+import 'package:customer/utils/fire_store_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dash/flutter_dash.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -16,6 +25,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:google_maps_place_picker_mb/google_maps_place_picker.dart';
+import 'package:http/http.dart' as http;
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -634,12 +644,14 @@ class HomeScreen extends StatelessWidget {
         return SafeArea(
           child: FractionallySizedBox(
             heightFactor: 0.4,
-            child:
-            StreamBuilder(
-              stream: FirebaseFirestore.instance.collection(CollectionName.orders).doc(controller.orderModel.value.id).snapshots(),
+            child: StreamBuilder(
+              stream: FirebaseFirestore.instance
+                  .collection(CollectionName.orders)
+                  .doc(controller.orderModel.value.id)
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return  Center(child: Text('Something went wrong'.tr));
+                  return Center(child: Text('Something went wrong'.tr));
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -648,112 +660,314 @@ class HomeScreen extends StatelessWidget {
 
                 controller.orderModel.value = OrderModel.fromJson(snapshot.data!.data()!);
 
-                if(controller.orderModel.value.acceptedDriverId == null) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: isDarkMode ? AppColors.darkBackground : AppColors
-                          .background,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isDarkMode
-                              ? Colors.black.withOpacity(0.5)
-                              : Colors.grey.withOpacity(0.2),
-                          blurRadius: 10,
-                          offset: const Offset(0, -5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Mensagem e Loader
-                        Column(
-                          children: [
-                            Text(
-                              "Procurando um motorista...",
-                              style: GoogleFonts.poppins(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: isDarkMode
-                                    ? AppColors.lightGray
-                                    : AppColors.darkGray,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 20),
-                            CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                isDarkMode ? AppColors.success : AppColors
-                                    .primary,
-                              ),
-                              strokeWidth: 4,
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              "Por favor, aguarde enquanto encontramos o melhor motorista para você.",
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: isDarkMode
-                                    ? AppColors.lightGray
-                                    : AppColors.subTitleColor,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
+                // NOVA LÓGICA: Detectar quando motorista aceita e processar pagamento automaticamente
+                if (controller.orderModel.value.acceptedDriverId != null &&
+                    controller.orderModel.value.acceptedDriverId!.isNotEmpty &&
+                    controller.orderModel.value.status == Constant.ridePlaced) {
 
-                        // Botão Cancelar
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              await controller.cancelTrip(context);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.error,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              "Cancelar",
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  Future.microtask(() {
-                    Get.to(
-                      const OrderDetailsScreen(),
-                      arguments: {
-                        "orderModel": controller.orderModel.value,
-                      },
-                    );
+                  // Processar pagamento automaticamente
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _processAutomaticPaymentAndAcceptRide(context, controller);
                   });
-                  Navigator.pop(context);
-                  return const SizedBox.shrink();
+
+                  return _buildPaymentProcessingUI(context, isDarkMode);
                 }
+
+                // LÓGICA ORIGINAL: Ainda procurando motorista
+                if (controller.orderModel.value.acceptedDriverId == null) {
+                  return _buildSearchingDriverUI(context, isDarkMode, controller);
+                }
+
+                // Se chegou aqui, algo inesperado aconteceu
+                return _buildSearchingDriverUI(context, isDarkMode, controller);
               },
             ),
           ),
-
         );
       },
+    );
+  }
+
+  Future<void> _processAutomaticPaymentAndAcceptRide(BuildContext context, HomeController controller) async {
+    try {
+      ShowToastDialog.showLoader("Processando pagamento automaticamente...".tr);
+
+      // Buscar dados do motorista que aceitou
+      String acceptedDriverId = controller.orderModel.value.acceptedDriverId!.first;
+
+      // Buscar dados do motorista
+      DriverUserModel? driverModel = await FireStoreUtils.getDriver(acceptedDriverId);
+      if (driverModel == null) {
+        throw Exception('Motorista não encontrado');
+      }
+
+      // Buscar dados do usuário
+      UserModel? userModel = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+      if (userModel == null) {
+        throw Exception('Usuário não encontrado');
+      }
+
+      // Calcular valor da corrida
+      double amount = await _calculateRideAmount(controller);
+
+      // Processar pagamento
+      await _processPayment(controller, amount);
+
+      // Atualizar status da corrida para ativa
+      await _activateRide(controller, acceptedDriverId, amount, driverModel);
+
+      // Enviar notificação para o motorista
+      await _sendDriverNotification(driverModel);
+
+      ShowToastDialog.closeLoader();
+
+      // Navegar para a tela de informações do motorista
+      Navigator.pop(context); // Fechar o bottom sheet
+      Get.to(const DriverInfoScreen(), arguments: {
+        "orderModel": controller.orderModel.value,
+      });
+
+    } catch (e) {
+      ShowToastDialog.closeLoader();
+      ShowToastDialog.showToast("Erro ao processar pagamento: ${e.toString()}");
+      print("Erro no pagamento automático: $e");
+    }
+  }
+
+// NOVA FUNÇÃO: Calcular valor da corrida
+  Future<double> _calculateRideAmount(HomeController controller) async {
+    try {
+      var finalRate = controller.orderModel.value.offerRate ?? "0";
+      return double.parse(finalRate.toString());
+    } catch (e) {
+      throw Exception('Erro ao calcular valor da corrida');
+    }
+  }
+
+// NOVA FUNÇÃO: Processar pagamento
+  Future<void> _processPayment(HomeController controller, double amount) async {
+    PagarMeService pagarmeService = PagarMeService();
+
+    if (controller.orderModel.value.creditCard != null) {
+      var creditCard = controller.orderModel.value.creditCard;
+
+      if (creditCard!.transationalType != 'PIX') {
+        // Pagamento com cartão
+        http.Response response = await pagarmeService.createOrder(
+          amount: int.parse(amount.toString().replaceAll('.', '')),
+          creditCard: creditCard,
+          orderId: controller.orderModel.value.id!,
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Falha no pagamento com cartão');
+        }
+      } else {
+        // Pagamento PIX
+        http.Response response = await pagarmeService.createPixTransaction(
+          amount: int.parse(amount.toString().replaceAll('.', '')),
+          orderId: controller.orderModel.value.id!,
+        );
+
+        if (response.statusCode != 200) {
+          throw Exception('Falha no pagamento PIX');
+        }
+      }
+
+      // Registrar transação na carteira do usuário
+      await _registerWalletTransaction(controller, amount);
+    }
+  }
+
+// NOVA FUNÇÃO: Registrar transação na carteira
+  Future<void> _registerWalletTransaction(HomeController controller, double amount) async {
+    WalletTransactionModel transactionModel = WalletTransactionModel(
+      id: Constant.getUuid(),
+      amount: "-$amount",
+      createdDate: Timestamp.now(),
+      paymentType: controller.orderModel.value.creditCard!.transationalType == 'credit' ? 'Cartão' : 'PIX',
+      transactionId: controller.orderModel.value.id,
+      note: "Valor da viagem débitada".tr,
+      orderType: "city",
+      userType: "customer",
+      userId: FireStoreUtils.getCurrentUid(),
+    );
+
+    await FireStoreUtils.setWalletTransaction(transactionModel);
+    await FireStoreUtils.updateUserWallet(amount: amount.toString());
+  }
+
+// NOVA FUNÇÃO: Ativar corrida
+  Future<void> _activateRide(HomeController controller, String driverId, double amount, DriverUserModel driverModel) async {
+    controller.orderModel.value.acceptedDriverId = [];
+    controller.orderModel.value.driverId = driverId;
+    controller.orderModel.value.status = Constant.rideActive;
+    controller.orderModel.value.finalRate = amount.toString();
+
+    await FireStoreUtils.setOrder(controller.orderModel.value);
+  }
+
+// NOVA FUNÇÃO: Enviar notificação para motorista
+  Future<void> _sendDriverNotification(DriverUserModel driverModel) async {
+    if (driverModel.fcmToken != null) {
+      await SendNotification.sendOneNotification(
+        token: driverModel.fcmToken.toString(),
+        title: 'Corrida Confirmada'.tr,
+        body: 'Sua solicitação de viagem foi aceita pelo passageiro. Por favor, prossiga para o local de retirada.'.tr,
+        payload: {},
+      );
+    }
+  }
+
+// NOVA FUNÇÃO: UI para quando está processando pagamento
+  Widget _buildPaymentProcessingUI(BuildContext context, bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppColors.darkBackground : AppColors.background,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.5)
+                : Colors.grey.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Ícone de sucesso
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.success.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.payment,
+              size: 40,
+              color: AppColors.success,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Text(
+            "Motorista encontrado!",
+            style: GoogleFonts.poppins(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? AppColors.lightGray : AppColors.darkGray,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+
+          Text(
+            "Processando pagamento automaticamente...",
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              color: isDarkMode ? AppColors.lightGray : AppColors.subTitleColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.success),
+            strokeWidth: 4,
+          ),
+        ],
+      ),
+    );
+  }
+
+// NOVA FUNÇÃO: UI para quando ainda está procurando motorista (mantém original)
+  Widget _buildSearchingDriverUI(BuildContext context, bool isDarkMode, HomeController controller) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppColors.darkBackground : AppColors.background,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.5)
+                : Colors.grey.withOpacity(0.2),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Mensagem e Loader
+          Column(
+            children: [
+              Text(
+                "Procurando um motorista...",
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? AppColors.lightGray : AppColors.darkGray,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isDarkMode ? AppColors.success : AppColors.primary,
+                ),
+                strokeWidth: 4,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                "Por favor, aguarde enquanto encontramos o melhor motorista para você.",
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: isDarkMode ? AppColors.lightGray : AppColors.subTitleColor,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+
+          // Botão Cancelar
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                await controller.cancelTrip(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDarkMode ? AppColors.error : AppColors.error,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                'Cancelar Corrida',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
