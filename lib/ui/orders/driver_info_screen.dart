@@ -320,8 +320,6 @@ class DriverInfoScreen extends StatelessWidget {
                   SizedBox(height: isTablet ? 24 : 20),
                   _buildTripSection(controller, isDarkMode, isTablet),
                   SizedBox(height: isTablet ? 24 : 20),
-                  _buildOTPSection(controller, isDarkMode, isTablet),
-                  SizedBox(height: isTablet ? 24 : 20),
                   _buildActionButtons(context, controller, isDarkMode, isTablet),
                 ],
               ),
@@ -658,108 +656,6 @@ class DriverInfoScreen extends StatelessWidget {
             title,
             style: GoogleFonts.poppins(
               fontSize: isTablet ? 10 : 8,
-              color: isDarkMode ? Colors.white70 : Colors.black54,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOTPSection(DriverInfoController controller, bool isDarkMode, bool isTablet) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isDarkMode
-              ? [
-            const Color(0xFF4C1D95).withOpacity(0.3),
-            const Color(0xFF7C3AED).withOpacity(0.1),
-          ]
-              : [
-            const Color(0xFF7C3AED).withOpacity(0.1),
-            const Color(0xFF4C1D95).withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
-        border: Border.all(
-          color: const Color(0xFF7C3AED).withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.verified_user_rounded,
-                color: const Color(0xFF7C3AED),
-                size: isTablet ? 24 : 20,
-              ),
-              SizedBox(width: isTablet ? 8 : 6),
-              Text(
-                'Código de Verificação',
-                style: GoogleFonts.poppins(
-                  fontSize: isTablet ? 16 : 14,
-                  fontWeight: FontWeight.bold,
-                  color: isDarkMode ? Colors.white : Colors.black87,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: isTablet ? 16 : 12),
-          GestureDetector(
-            onTap: () {
-              Clipboard.setData(ClipboardData(text: controller.orderModel.value.otp ?? ''));
-              ShowToastDialog.showToast('Código copiado!');
-            },
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 24 : 20,
-                vertical: isTablet ? 16 : 12,
-              ),
-              decoration: BoxDecoration(
-                color: isDarkMode
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.white.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(isTablet ? 16 : 12),
-                border: Border.all(
-                  color: const Color(0xFF7C3AED).withOpacity(0.3),
-                  width: 2,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    controller.orderModel.value.otp ?? '----',
-                    style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 28 : 24,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF7C3AED),
-                      letterSpacing: isTablet ? 6 : 4,
-                    ),
-                  ),
-                  SizedBox(width: isTablet ? 12 : 8),
-                  Icon(
-                    Icons.copy_rounded,
-                    color: const Color(0xFF7C3AED),
-                    size: isTablet ? 20 : 16,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: isTablet ? 12 : 8),
-          Text(
-            'Toque para copiar • Forneça este código ao motorista',
-            style: GoogleFonts.poppins(
-              fontSize: isTablet ? 11 : 9,
               color: isDarkMode ? Colors.white70 : Colors.black54,
             ),
             textAlign: TextAlign.center,
