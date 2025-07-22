@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:customer/constant/collection_name.dart';
@@ -68,7 +70,8 @@ class HomeScreen extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // Location Input Section
-                                  buildDynamicLocationSection(context, controller),
+                                  buildDynamicLocationSection(
+                                      context, controller),
                                   const SizedBox(height: 20),
 
                                   // Vehicle Selection Section
@@ -138,7 +141,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget buildDynamicLocationSection(BuildContext context, HomeController controller) {
+  Widget buildDynamicLocationSection(BuildContext context,
+      HomeController controller) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -191,7 +195,8 @@ class HomeScreen extends StatelessWidget {
                 child: buildLocationInput(
                   context: context,
                   icon: Icons.location_on,
-                  text: controller.destinationLocationController.value.isNotEmpty
+                  text: controller.destinationLocationController.value
+                      .isNotEmpty
                       ? controller.destinationLocationController.value
                       : 'Informe o destino',
                 ),
@@ -351,7 +356,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget buildVehicleSelection(BuildContext context, HomeController controller) {
+  Widget buildVehicleSelection(BuildContext context,
+      HomeController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -360,7 +366,9 @@ class HomeScreen extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontWeight: FontWeight.w500,
             letterSpacing: 1,
-            color: Theme.of(context).brightness == Brightness.dark
+            color: Theme
+                .of(context)
+                .brightness == Brightness.dark
                 ? AppColors.lightGray
                 : Colors.black,
           ),
@@ -374,7 +382,8 @@ class HomeScreen extends StatelessWidget {
             itemBuilder: (context, index) {
               final serviceModel = controller.serviceList[index];
               return Obx(() {
-                final isSelected = controller.selectedType.value.id == serviceModel.id;
+                final isSelected = controller.selectedType.value.id ==
+                    serviceModel.id;
                 return GestureDetector(
                   onTap: () {
                     controller.selectedType.value = serviceModel;
@@ -389,7 +398,8 @@ class HomeScreen extends StatelessWidget {
                       color: isSelected ? AppColors.primary : AppColors.gray,
                       borderRadius: const BorderRadius.all(Radius.circular(20)),
                       border: Border.all(
-                        color: isSelected ? AppColors.success : Colors.transparent,
+                        color: isSelected ? AppColors.success : Colors
+                            .transparent,
                         width: 2,
                       ),
                     ),
@@ -402,8 +412,10 @@ class HomeScreen extends StatelessWidget {
                           fit: BoxFit.contain,
                           height: Responsive.height(8, context),
                           width: Responsive.width(18, context),
-                          placeholder: (context, url) => const CircularProgressIndicator(),
-                          errorWidget: (context, url, error) => const Icon(Icons.error),
+                          placeholder: (context,
+                              url) => const CircularProgressIndicator(),
+                          errorWidget: (context, url, error) =>
+                          const Icon(Icons.error),
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -443,13 +455,14 @@ class HomeScreen extends StatelessWidget {
               width: 26,
             ),
             const SizedBox(width: 10),
-            Obx(() => Expanded(
-              child: Text(
-                controller.selectedPaymentMethod.value.cardHolderName ??
-                    'Selecione o método de pagamento',
-                style: GoogleFonts.poppins(fontSize: 14),
-              ),
-            )),
+            Obx(() =>
+                Expanded(
+                  child: Text(
+                    controller.selectedPaymentMethod.value.cardHolderName ??
+                        'Selecione o método de pagamento',
+                    style: GoogleFonts.poppins(fontSize: 14),
+                  ),
+                )),
             const Icon(Icons.arrow_drop_down_outlined),
           ],
         ),
@@ -458,7 +471,9 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget buildConfirmButton(BuildContext context, HomeController controller) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final isDarkMode = Theme
+        .of(context)
+        .brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
@@ -466,12 +481,13 @@ class HomeScreen extends StatelessWidget {
       child: ElevatedButton(
         onPressed: () async {
           var result = await controller.createOrder();
-          if(result) {
+          if (result) {
             showFindingDriverBottomSheet(context, controller);
           }
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: isDarkMode ? AppColors.darkModePrimary : AppColors.primary,
+          backgroundColor: isDarkMode ? AppColors.darkModePrimary : AppColors
+              .primary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
           ),
@@ -494,49 +510,51 @@ class HomeScreen extends StatelessWidget {
   }
 
 
-  Future<void> _pickLocation(
-      BuildContext context, HomeController controller, {required bool isSource}) async {
+  Future<void> _pickLocation(BuildContext context, HomeController controller,
+      {required bool isSource}) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PlacePicker(
-          apiKey: Constant.mapAPIKey,
-          initialPosition: const LatLng(-23.55052, -46.633308),
-          useCurrentLocation: true,
-          selectInitialPosition: true,
-          usePinPointingSearch: true,
-          usePlaceDetailSearch: true,
-          zoomGesturesEnabled: true,
-          zoomControlsEnabled: true,
-          resizeToAvoidBottomInset: false,
-          region: '.br',
-          autocompleteLanguage: 'pt-BR',
-          autocompleteRadius: 200000,
-          searchingText: 'Aguarde...',
-          onPlacePicked: (result) {
-            Navigator.of(context).pop();
-            if (isSource) {
-              controller.sourceLocationController.value = result.name ?? "";
-              controller.sourceLocationLAtLng.value = LocationLatLng(
-                latitude: result.geometry!.location.lat,
-                longitude: result.geometry!.location.lng,
-              );
-            } else {
-              controller.destinationLocationController.value = result.name ?? "";
-              controller.destinationLocationLAtLng.value = LocationLatLng(
-                latitude: result.geometry!.location.lat,
-                longitude: result.geometry!.location.lng,
-              );
-            }
-            controller.calculateAmount();
-          },
-        ),
+        builder: (context) =>
+            PlacePicker(
+              apiKey: Constant.mapAPIKey,
+              initialPosition: const LatLng(-23.55052, -46.633308),
+              useCurrentLocation: true,
+              selectInitialPosition: true,
+              usePinPointingSearch: true,
+              usePlaceDetailSearch: true,
+              zoomGesturesEnabled: true,
+              zoomControlsEnabled: true,
+              resizeToAvoidBottomInset: false,
+              region: '.br',
+              autocompleteLanguage: 'pt-BR',
+              autocompleteRadius: 200000,
+              searchingText: 'Aguarde...',
+              onPlacePicked: (result) {
+                Navigator.of(context).pop();
+                if (isSource) {
+                  controller.sourceLocationController.value = result.name ?? "";
+                  controller.sourceLocationLAtLng.value = LocationLatLng(
+                    latitude: result.geometry!.location.lat,
+                    longitude: result.geometry!.location.lng,
+                  );
+                } else {
+                  controller.destinationLocationController.value =
+                      result.name ?? "";
+                  controller.destinationLocationLAtLng.value = LocationLatLng(
+                    latitude: result.geometry!.location.lat,
+                    longitude: result.geometry!.location.lng,
+                  );
+                }
+                controller.calculateAmount();
+              },
+            ),
       ),
     );
   }
 
-  double _calculateDynamicDashHeight(
-      String sourceText, String destinationText, BuildContext context) {
+  double _calculateDynamicDashHeight(String sourceText, String destinationText,
+      BuildContext context) {
     final sourceHeight = _calculateTextHeight(sourceText, context);
     final destinationHeight = _calculateTextHeight(destinationText, context);
 
@@ -553,12 +571,17 @@ class HomeScreen extends StatelessWidget {
       text: textSpan,
       maxLines: 2,
       textDirection: TextDirection.ltr,
-    )..layout(maxWidth: MediaQuery.of(context).size.width - 100);
+    )
+      ..layout(maxWidth: MediaQuery
+          .of(context)
+          .size
+          .width - 100);
 
     return textPainter.size.height;
   }
 
-  void _showPaymentMethodsDialog(BuildContext context, HomeController controller) {
+  void _showPaymentMethodsDialog(BuildContext context,
+      HomeController controller) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -594,11 +617,12 @@ class HomeScreen extends StatelessWidget {
                         style: GoogleFonts.poppins(fontSize: 14),
                       ),
                       onTap: () {
-                        controller.selectedPaymentMethod.value = CreditCardUserModel(
-                          id: 'PIX',
-                          cardHolderName: 'PIX',
-                          transationalType: 'PIX',
-                        );
+                        controller.selectedPaymentMethod.value =
+                            CreditCardUserModel(
+                              id: 'PIX',
+                              cardHolderName: 'PIX',
+                              transationalType: 'PIX',
+                            );
                         controller.selectedPaymentMethod.refresh();
                         Navigator.pop(context);
                       },
@@ -626,8 +650,11 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void showFindingDriverBottomSheet(BuildContext context, HomeController controller) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  void showFindingDriverBottomSheet(BuildContext context,
+      HomeController controller) {
+    final isDarkMode = Theme
+        .of(context)
+        .brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
@@ -658,13 +685,13 @@ class HomeScreen extends StatelessWidget {
                   return Constant.loader();
                 }
 
-                controller.orderModel.value = OrderModel.fromJson(snapshot.data!.data()!);
+                controller.orderModel.value =
+                    OrderModel.fromJson(snapshot.data!.data()!);
 
                 // NOVA LÓGICA: Detectar quando motorista aceita e processar pagamento automaticamente
                 if (controller.orderModel.value.acceptedDriverId != null &&
                     controller.orderModel.value.acceptedDriverId!.isNotEmpty &&
                     controller.orderModel.value.status == Constant.ridePlaced) {
-
                   // Processar pagamento automaticamente
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     _processAutomaticPaymentAndAcceptRide(context, controller);
@@ -675,7 +702,8 @@ class HomeScreen extends StatelessWidget {
 
                 // LÓGICA ORIGINAL: Ainda procurando motorista
                 if (controller.orderModel.value.acceptedDriverId == null) {
-                  return _buildSearchingDriverUI(context, isDarkMode, controller);
+                  return _buildSearchingDriverUI(
+                      context, isDarkMode, controller);
                 }
 
                 // Se chegou aqui, algo inesperado aconteceu
@@ -688,21 +716,25 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _processAutomaticPaymentAndAcceptRide(BuildContext context, HomeController controller) async {
+  Future<void> _processAutomaticPaymentAndAcceptRide(BuildContext context,
+      HomeController controller) async {
     try {
       ShowToastDialog.showLoader("Processando pagamento automaticamente...".tr);
 
       // Buscar dados do motorista que aceitou
-      String acceptedDriverId = controller.orderModel.value.acceptedDriverId!.first;
+      String acceptedDriverId = controller.orderModel.value.acceptedDriverId!
+          .first;
 
       // Buscar dados do motorista
-      DriverUserModel? driverModel = await FireStoreUtils.getDriver(acceptedDriverId);
+      DriverUserModel? driverModel = await FireStoreUtils.getDriver(
+          acceptedDriverId);
       if (driverModel == null) {
         throw Exception('Motorista não encontrado');
       }
 
       // Buscar dados do usuário
-      UserModel? userModel = await FireStoreUtils.getUserProfile(FireStoreUtils.getCurrentUid());
+      UserModel? userModel = await FireStoreUtils.getUserProfile(
+          FireStoreUtils.getCurrentUid());
       if (userModel == null) {
         throw Exception('Usuário não encontrado');
       }
@@ -726,7 +758,6 @@ class HomeScreen extends StatelessWidget {
       Get.to(const DriverInfoScreen(), arguments: {
         "orderModel": controller.orderModel.value,
       });
-
     } catch (e) {
       ShowToastDialog.closeLoader();
       ShowToastDialog.showToast("Erro ao processar pagamento: ${e.toString()}");
@@ -780,12 +811,14 @@ class HomeScreen extends StatelessWidget {
   }
 
 // NOVA FUNÇÃO: Registrar transação na carteira
-  Future<void> _registerWalletTransaction(HomeController controller, double amount) async {
+  Future<void> _registerWalletTransaction(HomeController controller,
+      double amount) async {
     WalletTransactionModel transactionModel = WalletTransactionModel(
       id: Constant.getUuid(),
       amount: "-$amount",
       createdDate: Timestamp.now(),
-      paymentType: controller.orderModel.value.creditCard!.transationalType == 'credit' ? 'Cartão' : 'PIX',
+      paymentType: controller.orderModel.value.creditCard!.transationalType ==
+          'credit' ? 'Cartão' : 'PIX',
       transactionId: controller.orderModel.value.id,
       note: "Valor da viagem débitada".tr,
       orderType: "city",
@@ -798,7 +831,8 @@ class HomeScreen extends StatelessWidget {
   }
 
 // NOVA FUNÇÃO: Ativar corrida
-  Future<void> _activateRide(HomeController controller, String driverId, double amount, DriverUserModel driverModel) async {
+  Future<void> _activateRide(HomeController controller, String driverId,
+      double amount, DriverUserModel driverModel) async {
     controller.orderModel.value.acceptedDriverId = [];
     controller.orderModel.value.driverId = driverId;
     controller.orderModel.value.status = Constant.rideActive;
@@ -813,7 +847,8 @@ class HomeScreen extends StatelessWidget {
       await SendNotification.sendOneNotification(
         token: driverModel.fcmToken.toString(),
         title: 'Corrida Confirmada'.tr,
-        body: 'Sua solicitação de viagem foi aceita pelo passageiro. Por favor, prossiga para o local de retirada.'.tr,
+        body: 'Sua solicitação de viagem foi aceita pelo passageiro. Por favor, prossiga para o local de retirada.'
+            .tr,
         payload: {},
       );
     }
@@ -888,8 +923,35 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-// NOVA FUNÇÃO: UI para quando ainda está procurando motorista (mantém original)
-  Widget _buildSearchingDriverUI(BuildContext context, bool isDarkMode, HomeController controller) {
+  Widget _buildSearchingDriverUI(BuildContext context, bool isDarkMode,
+      HomeController controller) {
+    // Timer countdown de 5 minutos (300 segundos)
+    final RxInt timeRemaining = 300.obs;
+    Timer? countdownTimer;
+
+    // Iniciar timer quando o widget for criado
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (countdownTimer == null) {
+        countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+          if (timeRemaining.value > 0) {
+            timeRemaining.value--;
+          } else {
+            // Quando chegar a 0, cancelar automaticamente a viagem
+            timer.cancel();
+            controller.cancelTrip(context);
+          }
+        });
+      }
+    });
+
+    // Função para formatar o tempo (MM:SS)
+    String formatTime(int seconds) {
+      int minutes = seconds ~/ 60;
+      int remainingSeconds = seconds % 60;
+      return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds
+          .toString().padLeft(2, '0')}';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       decoration: BoxDecoration(
@@ -935,10 +997,49 @@ class HomeScreen extends StatelessWidget {
                 "Por favor, aguarde enquanto encontramos o melhor motorista para você.",
                 style: GoogleFonts.poppins(
                   fontSize: 14,
-                  color: isDarkMode ? AppColors.lightGray : AppColors.subTitleColor,
+                  color: isDarkMode ? AppColors.lightGray : AppColors
+                      .subTitleColor,
                 ),
                 textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 20),
+
+              // NOVO: Timer decrescente
+              Obx(() =>
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isDarkMode
+                          ? AppColors.error.withOpacity(0.1)
+                          : AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppColors.error.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.timer_outlined,
+                          size: 16,
+                          color: AppColors.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Cancelamento automático em ${formatTime(
+                              timeRemaining.value)}",
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
             ],
           ),
 
@@ -947,6 +1048,8 @@ class HomeScreen extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () async {
+                // Cancelar o timer se existir
+                countdownTimer?.cancel();
                 await controller.cancelTrip(context);
               },
               style: ElevatedButton.styleFrom(
