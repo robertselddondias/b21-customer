@@ -39,6 +39,8 @@ class OrderModel {
   ZoneModel? zone;
   String? zoneId;
 
+  String? cancelReason;
+
   OrderModel(
       {this.position,
       this.serviceId,
@@ -64,7 +66,10 @@ class OrderModel {
       this.someOneElse,
       this.service,
       this.adminCommission,
-      this.zone,this.zoneId});
+      this.zone,
+        this.zoneId,
+        this.cancelReason
+      });
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     serviceId = json['serviceId'];
@@ -89,6 +94,7 @@ class OrderModel {
     acceptedDriverId = json['acceptedDriverId'];
     rejectedDriverId = json['rejectedDriverId'];
     paymentStatus = json['paymentStatus'];
+    cancelReason = json['cancelReason'];
     position = json['position'] != null ? Positions.fromJson(json['position']) : null;
     service = json['service'] != null ? ServiceModel.fromJson(json['service']) : null;
     adminCommission = json['adminCommission'] != null ? AdminCommission.fromJson(json['adminCommission']) : null;
@@ -144,6 +150,7 @@ class OrderModel {
     data['acceptedDriverId'] = acceptedDriverId;
     data['rejectedDriverId'] = rejectedDriverId;
     data['paymentStatus'] = paymentStatus;
+    data['cancelReason'] = cancelReason;
     if (taxList != null) {
       data['taxList'] = taxList!.map((v) => v.toJson()).toList();
     }

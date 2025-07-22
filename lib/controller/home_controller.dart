@@ -3,6 +3,7 @@ import 'package:customer/constant/constant.dart';
 import 'package:customer/constant/send_notification.dart';
 import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/dash_board_controller.dart';
+import 'package:customer/controller/search_timer_controller.dart';
 import 'package:customer/model/airport_model.dart';
 import 'package:customer/model/banner_model.dart';
 import 'package:customer/model/credit_card_model.dart';
@@ -41,6 +42,8 @@ class HomeController extends GetxController {
   Rx<LocationLatLng> sourceLocationLAtLng = LocationLatLng().obs;
   Rx<LocationLatLng> destinationLocationLAtLng = LocationLatLng().obs;
 
+  final SearchTimerController searchTimer = Get.put(SearchTimerController());
+
   RxString currentLocation = "".obs;
   RxBool isLoading = true.obs;
   RxList bannerList = <BannerModel>[].obs;
@@ -48,6 +51,8 @@ class HomeController extends GetxController {
   Rx<ZoneModel> selectedZone = ZoneModel().obs;
   Rx<UserModel> userModel = UserModel().obs;
   RxInt selectedCardIndex = 0.obs;
+
+  RxBool isSearchTimerRunning = false.obs;
 
   Rx<OrderModel> orderModel = OrderModel().obs;
 
@@ -71,6 +76,15 @@ class HomeController extends GetxController {
     getServiceType();
     getPaymentData();
     super.onInit();
+  }
+
+  @override
+  void onClose() {
+    // 🆕 APENAS ADICIONAR - Cleanup do timer
+    if (isSearchTimerRunning.value) {
+      searchTimer.stopTimer();
+    }
+    super.onClose();
   }
 
   Future<bool> createOrder() async {
@@ -448,5 +462,7 @@ class HomeController extends GetxController {
     return hasAcceptedDriver() &&
         orderModel.value.status == Constant.ridePlaced;
   }
+
+
 
 }
