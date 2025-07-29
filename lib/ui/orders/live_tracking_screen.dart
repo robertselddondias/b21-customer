@@ -3,7 +3,6 @@ import 'package:customer/constant/show_toast_dialog.dart';
 import 'package:customer/controller/live_tracking_controller.dart';
 import 'package:customer/themes/app_colors.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_osm_plugin/flutter_osm_plugin.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -29,31 +28,7 @@ class LiveTrackingScreen extends StatelessWidget {
                   Icons.arrow_back,
                 )),
           ),
-          body: Constant.selectedMapType == 'osm'
-              ? OSMFlutter(
-                  controller: controller.mapOsmController,
-                  osmOption: const OSMOption(
-                    userTrackingOption: UserTrackingOption(
-                      enableTracking: false,
-                      unFollowUser: false,
-                    ),
-                    zoomOption: ZoomOption(
-                      initZoom: 16,
-                      minZoomLevel: 2,
-                      maxZoomLevel: 19,
-                      stepZoom: 1.0,
-                    ),
-                    roadConfiguration: RoadOption(
-                      roadColor: Colors.yellowAccent,
-                    ),
-                  ),
-                  onMapIsReady: (active) async {
-                    if (active) {
-                      controller.getArgument();
-                      ShowToastDialog.closeLoader();
-                    }
-                  })
-              : Obx(
+          body: Obx(
                   () => GoogleMap(
                     myLocationEnabled: true,
                     myLocationButtonEnabled: true,
@@ -73,7 +48,7 @@ class LiveTrackingScreen extends StatelessWidget {
                           Constant.currentLocation != null ? Constant.currentLocation!.longitude : -122.677433),
                     ),
                   ),
-                ),
+          ),
         );
       },
     );
